@@ -8,6 +8,8 @@ import SwitchNode
 import AppBundle
 import ComponentFlow
 
+// MARK: - Enums & Class Definition
+
 public enum ItemListSwitchItemNodeType {
     case regular
     case icon
@@ -114,7 +116,9 @@ public class ItemListSwitchItem: ListViewItem, ItemListItem {
     }
 }
 
-protocol ItemListSwitchNodeImpl {
+// MARK: - Protocols & Extensions
+
+protocol ItemListSwitchNodeImpl: ASDisplayNode {
     var frameColor: UIColor { get set }
     var contentColor: UIColor { get set }
     var handleColor: UIColor { get set }
@@ -122,28 +126,26 @@ protocol ItemListSwitchNodeImpl {
     var negativeContentColor: UIColor { get set }
     
     var isOn: Bool { get }
+    var valueUpdated: ((Bool) -> Void)? { get set }
+    
     func setOn(_ value: Bool, animated: Bool)
+    func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize
 }
 
 extension SwitchNode: ItemListSwitchNodeImpl {
     var positiveContentColor: UIColor {
-        get {
-            return .white
-        } set(value) {
-            
-        }
+        get { return .white } set(value) { }
     }
     var negativeContentColor: UIColor {
-        get {
-            return .white
-        } set(value) {
-            
-        }
+        get { return .white } set(value) { }
     }
 }
 
 extension IconSwitchNode: ItemListSwitchNodeImpl {
+    // IconSwitchNode biasanya tidak diubah untuk task ini, tapi kita butuh conformance
 }
+
+// MARK: - Node Implementation
 
 public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
     private let backgroundNode: ASDisplayNode
@@ -155,14 +157,15 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
     private let iconNode: ASImageNode
     private let titleNode: TextNode
     private var textNode: TextNode?
-    private var switchNode: ASDisplayNode & ItemListSwitchNodeImpl
+    
+    // Menggunakan Protocol agar fleksibel
+    private var switchNode: ItemListSwitchNodeImpl
+    
     private let switchGestureNode: ASDisplayNode
     private var disabledOverlayNode: ASDisplayNode?
     
     private var titleBadgeComponentView: ComponentView<Empty>?
-    
     private var lockedIconNode: ASImageNode?
-    
     private let activateArea: AccessibilityAreaNode
     
     private var item: ItemListSwitchItem?
@@ -193,6 +196,7 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
         self.titleNode.anchorPoint = CGPoint()
         self.titleNode.isUserInteractionEnabled = false
         
+        // Inisialisasi Switch berdasarkan tipe
         switch type {
             case .regular:
                 self.switchNode = SwitchNode()
@@ -210,10 +214,12 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
         super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.titleNode)
+        // SwitchNode adalah ASDisplayNode, jadi bisa langsung addSubnode
         self.addSubnode(self.switchNode)
         self.addSubnode(self.switchGestureNode)
         self.addSubnode(self.activateArea)
         
+        // Setup Accessibility
         self.activateArea.activate = { [weak self] in
             guard let strongSelf = self, let item = strongSelf.item, item.enabled else {
                 return false
@@ -230,7 +236,13 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
     override public func didLoad() {
         super.didLoad()
         
-        (self.switchNode.view as? UISwitch)?.addTarget(self, action: #selector(self.switchValueChanged(_:)), for: .valueChanged)
+        // Gunakan callback closure untuk update value
+        self.switchNode.valueUpdated = { [weak self] value in
+            if let item = self?.item {
+                item.updated(value)
+            }
+        }
+        
         self.switchGestureNode.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
     }
     
@@ -280,8 +292,6 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
                 contentSize = CGSize(width: params.width, height: 44.0)
                 insets = itemListNeighborsGroupedInsets(neighbors, params)
             }
-            
-            
             
             var topInset: CGFloat
             if item.text != nil {
@@ -498,19 +508,16 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
                         }
                     }
                     
-                    if let switchView = strongSelf.switchNode.view as? UISwitch {
-                        if strongSelf.switchNode.bounds.size.width.isZero {
-                            switchView.sizeToFit()
-                        }
-                        let switchSize = switchView.bounds.size
-                        
-                        transition.updateFrame(node: strongSelf.switchNode, frame: CGRect(origin: CGPoint(x: params.width - params.rightInset - switchSize.width - 15.0, y: floor((contentSize.height - switchSize.height) / 2.0)), size: switchSize))
-                        strongSelf.switchGestureNode.frame = strongSelf.switchNode.frame
-                        if switchView.isOn != item.value {
-                            switchView.setOn(item.value, animated: animated)
-                        }
-                        switchView.isUserInteractionEnabled = item.enableInteractiveChanges
+                    // Layout Switch (Versi Baru: Glass)
+                    let switchSize = strongSelf.switchNode.calculateSizeThatFits(CGSize(width: 100, height: 100))
+                    
+                    transition.updateFrame(node: strongSelf.switchNode, frame: CGRect(origin: CGPoint(x: params.width - params.rightInset - switchSize.width - 15.0, y: floor((contentSize.height - switchSize.height) / 2.0)), size: switchSize))
+                    strongSelf.switchGestureNode.frame = strongSelf.switchNode.frame
+                    
+                    if strongSelf.switchNode.isOn != item.value {
+                        strongSelf.switchNode.setOn(item.value, animated: animated)
                     }
+                    strongSelf.switchNode.isUserInteractionEnabled = item.enableInteractiveChanges
                     strongSelf.switchGestureNode.isHidden = item.enableInteractiveChanges && item.enabled
                     
                     if item.displayLocked {
@@ -555,6 +562,7 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
                         lockedIconNode.removeFromSupernode()
                     }
                     
+                    // Implementasi Title Badge Component (Yang menyebabkan error sebelumnya)
                     if let component = item.titleBadgeComponent {
                         let componentView: ComponentView<Empty>
                         if let current = strongSelf.titleBadgeComponentView {
@@ -596,13 +604,11 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
         if !item.enabled {
             return false
         }
-        if let switchNode = self.switchNode as? IconSwitchNode {
-            switchNode.isOn = !switchNode.isOn
-            item.updated(switchNode.isOn)
-        } else if let switchNode = self.switchNode as? SwitchNode {
-            switchNode.isOn = !switchNode.isOn
-            item.updated(switchNode.isOn)
-        }
+        
+        let newValue = !self.switchNode.isOn
+        self.switchNode.setOn(newValue, animated: true)
+        item.updated(newValue)
+        
         return true
     }
     
@@ -656,17 +662,10 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
         self.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.15, removeOnCompletion: false)
     }
     
-    @objc private func switchValueChanged(_ switchView: UISwitch) {
-        if let item = self.item {
-            let value = switchView.isOn
-            item.updated(value)
-        }
-    }
-    
     @objc private func tapGesture(_ recognizer: UITapGestureRecognizer) {
-        if let item = self.item, let switchView = self.switchNode.view as? UISwitch, case .ended = recognizer.state {
+        if let item = self.item, case .ended = recognizer.state {
             if item.enabled && !item.displayLocked {
-                let value = switchView.isOn
+                let value = self.switchNode.isOn
                 item.updated(!value)
             } else {
                 item.activatedWhileDisabled()

@@ -1,48 +1,20 @@
 import Foundation
 import UIKit
 import AsyncDisplayKit
+import SwiftUI
+// HAPUS: import Display (karena file ini sudah ada di dalam modul Display)
 
-private final class SwitchNodeViewLayer: CALayer {
-    override func setNeedsDisplay() {
-    }
-}
-
-private final class SwitchNodeView: UISwitch {
-    override class var layerClass: AnyClass {
-        if #available(iOS 26.0, *) {
-            return super.layerClass
-        } else {
-            return SwitchNodeViewLayer.self
-        }
-    }
-}
-
+// Ganti SwitchNode agar menggunakan HostingController, bukan UISwitch
 open class SwitchNode: ASDisplayNode {
     public var valueUpdated: ((Bool) -> Void)?
     
-    public var frameColor = UIColor(rgb: 0xe0e0e0) {
-        didSet {
-            if self.isNodeLoaded {
-                if oldValue != self.frameColor {
-                    (self.view as! UISwitch).tintColor = self.frameColor
-                }
-            }
-        }
-    }
-    public var handleColor = UIColor(rgb: 0xffffff) {
-        didSet {
-            if self.isNodeLoaded {
-                //(self.view as! UISwitch).thumbTintColor = self.handleColor
-            }
-        }
-    }
+    // Warna default Telegram
+    public var frameColor = UIColor(rgb: 0xe0e0e0)
+    public var handleColor = UIColor(rgb: 0xffffff)
     public var contentColor = UIColor(rgb: 0x42d451) {
         didSet {
-            if self.isNodeLoaded {
-                if oldValue != self.contentColor {
-                    (self.view as! UISwitch).onTintColor = self.contentColor
-                }
-            }
+            // Update warna switch jika berubah (Real-time update)
+            self.updateSwiftUIState()
         }
     }
     
@@ -50,55 +22,91 @@ open class SwitchNode: ASDisplayNode {
     public var isOn: Bool {
         get {
             return self._isOn
-        } set(value) {
-            if (value != self._isOn) {
+        }
+        set(value) {
+            if value != self._isOn {
                 self._isOn = value
-                if self.isNodeLoaded {
-                    (self.view as! UISwitch).setOn(value, animated: false)
-                }
+                self.updateSwiftUIState()
             }
         }
     }
     
+    // Wrapper untuk SwiftUI
+    private var hostingController: UIHostingController<LiquidGlassSwitchView>?
+    
     override public init() {
         super.init()
         
-        self.setViewBlock({
-            return SwitchNodeView()
-        })
+        self.backgroundColor = .clear
+        self.isOpaque = false
     }
     
     override open func didLoad() {
         super.didLoad()
         
-        self.view.isAccessibilityElement = false
+        // Membuat Binding untuk SwiftUI
+        let binding = Binding<Bool>(
+            get: { [weak self] in
+                return self?._isOn ?? false
+            },
+            set: { [weak self] newValue in
+                guard let self = self else { return }
+                if self._isOn != newValue {
+                    self._isOn = newValue
+                    self.valueUpdated?(newValue)
+                }
+            }
+        )
         
-        (self.view as! UISwitch).backgroundColor = self.backgroundColor
-        (self.view as! UISwitch).tintColor = self.frameColor
-        (self.view as! UISwitch).onTintColor = self.contentColor
+        // Inisialisasi View SwiftUI
+        let swiftUIView = LiquidGlassSwitchView(
+            isOn: binding,
+            activeColor: self.contentColor,
+            inactiveColor: self.frameColor
+        )
         
-        (self.view as! UISwitch).setOn(self._isOn, animated: false)
+        // Bungkus dalam Hosting Controller
+        let host = UIHostingController(rootView: swiftUIView)
+        host.view.backgroundColor = .clear
+        host.view.frame = CGRect(x: 0, y: 0, width: 51, height: 31)
         
-        (self.view as! UISwitch).addTarget(self, action: #selector(switchValueChanged(_:)), for: .valueChanged)
+        // Masukkan ke dalam Node View
+        self.view.addSubview(host.view)
+        self.hostingController = host
+    }
+    
+    // Fungsi helper untuk update state
+    private func updateSwiftUIState() {
+        guard let host = self.hostingController else { return }
+        
+        let binding = Binding<Bool>(
+            get: { [weak self] in self?._isOn ?? false },
+            set: { [weak self] val in
+                self?._isOn = val
+                self?.valueUpdated?(val)
+            }
+        )
+        
+        host.rootView = LiquidGlassSwitchView(
+            isOn: binding,
+            activeColor: self.contentColor,
+            inactiveColor: self.frameColor
+        )
     }
     
     public func setOn(_ value: Bool, animated: Bool) {
-        self._isOn = value
-        if self.isNodeLoaded {
-            (self.view as! UISwitch).setOn(value, animated: animated)
-        }
+        self.isOn = value
     }
     
+    // API Standar Telegram untuk menghitung ukuran
     override open func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
-        if #available(iOS 26.0, *) {
-            return CGSize(width: 63.0, height: 28.0)
-        } else {
-            return CGSize(width: 51.0, height: 31.0)
-        }
+        return CGSize(width: 51.0, height: 31.0)
     }
     
-    @objc func switchValueChanged(_ view: UISwitch) {
-        self._isOn = view.isOn
-        self.valueUpdated?(view.isOn)
+    override open func layout() {
+        super.layout()
+        if let hostView = self.hostingController?.view {
+            hostView.frame = self.bounds
+        }
     }
 }
