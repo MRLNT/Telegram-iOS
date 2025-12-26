@@ -8,8 +8,6 @@ import SwitchNode
 import AppBundle
 import ComponentFlow
 
-// MARK: - Enums & Class Definition
-
 public enum ItemListSwitchItemNodeType {
     case regular
     case icon
@@ -116,8 +114,6 @@ public class ItemListSwitchItem: ListViewItem, ItemListItem {
     }
 }
 
-// MARK: - Protocols & Extensions
-
 protocol ItemListSwitchNodeImpl: ASDisplayNode {
     var frameColor: UIColor { get set }
     var contentColor: UIColor { get set }
@@ -141,11 +137,8 @@ extension SwitchNode: ItemListSwitchNodeImpl {
     }
 }
 
-extension IconSwitchNode: ItemListSwitchNodeImpl {
-    // IconSwitchNode biasanya tidak diubah untuk task ini, tapi kita butuh conformance
-}
+extension IconSwitchNode: ItemListSwitchNodeImpl { }
 
-// MARK: - Node Implementation
 
 public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
     private let backgroundNode: ASDisplayNode
@@ -158,7 +151,6 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
     private let titleNode: TextNode
     private var textNode: TextNode?
     
-    // Menggunakan Protocol agar fleksibel
     private var switchNode: ItemListSwitchNodeImpl
     
     private let switchGestureNode: ASDisplayNode
@@ -196,7 +188,6 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
         self.titleNode.anchorPoint = CGPoint()
         self.titleNode.isUserInteractionEnabled = false
         
-        // Inisialisasi Switch berdasarkan tipe
         switch type {
             case .regular:
                 self.switchNode = SwitchNode()
@@ -214,12 +205,10 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
         super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.titleNode)
-        // SwitchNode adalah ASDisplayNode, jadi bisa langsung addSubnode
         self.addSubnode(self.switchNode)
         self.addSubnode(self.switchGestureNode)
         self.addSubnode(self.activateArea)
         
-        // Setup Accessibility
         self.activateArea.activate = { [weak self] in
             guard let strongSelf = self, let item = strongSelf.item, item.enabled else {
                 return false
@@ -236,7 +225,6 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
     override public func didLoad() {
         super.didLoad()
         
-        // Gunakan callback closure untuk update value
         self.switchNode.valueUpdated = { [weak self] value in
             if let item = self?.item {
                 item.updated(value)
@@ -508,7 +496,6 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
                         }
                     }
                     
-                    // Layout Switch (Versi Baru: Glass)
                     let switchSize = strongSelf.switchNode.calculateSizeThatFits(CGSize(width: 100, height: 100))
                     
                     transition.updateFrame(node: strongSelf.switchNode, frame: CGRect(origin: CGPoint(x: params.width - params.rightInset - switchSize.width - 15.0, y: floor((contentSize.height - switchSize.height) / 2.0)), size: switchSize))
@@ -562,7 +549,6 @@ public class ItemListSwitchItemNode: ListViewItemNode, ItemListItemNode {
                         lockedIconNode.removeFromSupernode()
                     }
                     
-                    // Implementasi Title Badge Component (Yang menyebabkan error sebelumnya)
                     if let component = item.titleBadgeComponent {
                         let componentView: ComponentView<Empty>
                         if let current = strongSelf.titleBadgeComponentView {

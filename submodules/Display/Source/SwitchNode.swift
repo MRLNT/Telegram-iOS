@@ -2,18 +2,14 @@ import Foundation
 import UIKit
 import AsyncDisplayKit
 import SwiftUI
-// HAPUS: import Display (karena file ini sudah ada di dalam modul Display)
 
-// Ganti SwitchNode agar menggunakan HostingController, bukan UISwitch
 open class SwitchNode: ASDisplayNode {
     public var valueUpdated: ((Bool) -> Void)?
     
-    // Warna default Telegram
     public var frameColor = UIColor(rgb: 0xe0e0e0)
     public var handleColor = UIColor(rgb: 0xffffff)
     public var contentColor = UIColor(rgb: 0x42d451) {
         didSet {
-            // Update warna switch jika berubah (Real-time update)
             self.updateSwiftUIState()
         }
     }
@@ -31,7 +27,6 @@ open class SwitchNode: ASDisplayNode {
         }
     }
     
-    // Wrapper untuk SwiftUI
     private var hostingController: UIHostingController<LiquidGlassSwitchView>?
     
     override public init() {
@@ -44,7 +39,6 @@ open class SwitchNode: ASDisplayNode {
     override open func didLoad() {
         super.didLoad()
         
-        // Membuat Binding untuk SwiftUI
         let binding = Binding<Bool>(
             get: { [weak self] in
                 return self?._isOn ?? false
@@ -58,24 +52,20 @@ open class SwitchNode: ASDisplayNode {
             }
         )
         
-        // Inisialisasi View SwiftUI
         let swiftUIView = LiquidGlassSwitchView(
             isOn: binding,
             activeColor: self.contentColor,
             inactiveColor: self.frameColor
         )
         
-        // Bungkus dalam Hosting Controller
         let host = UIHostingController(rootView: swiftUIView)
         host.view.backgroundColor = .clear
         host.view.frame = CGRect(x: 0, y: 0, width: 51, height: 31)
         
-        // Masukkan ke dalam Node View
         self.view.addSubview(host.view)
         self.hostingController = host
     }
     
-    // Fungsi helper untuk update state
     private func updateSwiftUIState() {
         guard let host = self.hostingController else { return }
         
@@ -98,7 +88,6 @@ open class SwitchNode: ASDisplayNode {
         self.isOn = value
     }
     
-    // API Standar Telegram untuk menghitung ukuran
     override open func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
         return CGSize(width: 51.0, height: 31.0)
     }
